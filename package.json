@@ -1,0 +1,21 @@
+{
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
+    "@vueuse/core": "^14.3.0",
+    "element-plus": "^2.14.1",
+    "highlight.js": "^11.11.1",
+    "marked": "^18.0.4",
+    "marked-footnote": "^1.4.0",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.35"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.7",
+    "vite": "^8.0.16"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  }
+}
