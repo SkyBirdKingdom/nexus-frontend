@@ -36,7 +36,7 @@
                 :traces="chatStore.agentTraces" 
               />
               
-              <MarkdownView v-if="msg.content" :content="msg.content" />
+              <MarkdownView v-if="msg.content" :content="msg.content" :sources="msg.sources" />
             </template>
           </div>
         </div>

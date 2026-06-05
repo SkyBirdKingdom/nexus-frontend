@@ -55,6 +55,10 @@ export function useSSE() {
               if (parsedData.status === 'text') {
                 // 纯文本 Token 流，追加到打字机
                 chatStore.appendToLastMessage(parsedData.content)
+              } else if (parsedData.status === 'sources') {
+                // 🚀 核心新增：接收后端传来的纯净 Chunk 数据，挂载到当前消息对象上
+                const lastMsg = chatStore.messages[chatStore.messages.length - 1]
+                lastMsg.sources = parsedData.data
               } else {
                 // Agent 状态流 (planning, working, start)，追加到发光时间线
                 chatStore.agentTraces.push(parsedData)
