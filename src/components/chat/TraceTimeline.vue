@@ -11,7 +11,7 @@
         :key="index"
         :type="getIconType(trace.status)"
         :color="getColor(trace.status)"
-        :size="trace.status === 'working' ? 'small' : 'large'"
+        :size="trace.status === 'working' ? 'normal' : 'large'"
         :hollow="trace.status === 'working'"
       >
         <div class="trace-content">

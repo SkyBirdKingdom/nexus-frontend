@@ -6,63 +6,84 @@
       </el-button>
     </div>
 
-    <div class="history-list">
-      <div class="list-title">最近的探索</div>
-      <el-scrollbar>
-        <div 
-          v-for="session in chatStore.sessionList" 
-          :key="session.id"
-          :class="['session-item', chatStore.threadId === session.id ? 'active' : '']"
-          @click="chatStore.switchChat(session.id)"
-        >
-          <el-icon><ChatDotRound /></el-icon>
-          <div class="session-info">
-            <span class="session-title">{{ session.title }}</span>
-            <span class="session-date">{{ session.date }}</span>
-          </div>
-        </div>
-      </el-scrollbar>
-    </div>
-
     <div class="sidebar-footer" @click="kbDialogVisible = true">
       <el-avatar :size="32" style="background: #3b82f6;">U</el-avatar>
       <div class="user-info">
         <span class="user-name">Nexus Admin</span>
-        <span class="user-role">📚 知识库管理中心</span>
+        <span class="user-role">📚 数据连接器中心</span>
       </div>
       <el-icon class="settings-icon"><Setting /></el-icon>
     </div>
 
     <el-dialog
       v-model="kbDialogVisible"
-      title="Nexus 多模态知识库管理"
-      width="500px"
+      title="Nexus 多模态数据摄取中心 (Ingestion)"
+      width="700px"
       destroy-on-close
-      class="dark-dialog"
+      class="dark-dialog custom-connector-dialog"
     >
-      <div class="kb-desc">
-        上传企业 PDF 文档，后台 VLM 引擎（Qwen2.5-VL）将自动提取图表、解析网络拓扑并进行向量化。
-      </div>
-      
-      <el-upload
-        class="upload-demo"
-        drag
-        action="http://localhost:8000/api/v1/documents/upload"
-        multiple
-        :on-success="handleUploadSuccess"
-        :on-error="handleUploadError"
-        accept=".pdf"
-      >
-        <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-        <div class="el-upload__text">
-          将 PDF 拖到此处，或 <em>点击上传</em>
-        </div>
-        <template #tip>
-          <div class="el-upload__tip text-center">
-            ⚠️ VLM 解析含有大量图片的 PDF 可能会消耗较长时间，请耐心等待后台处理。
+      <el-tabs tab-position="left" class="connector-tabs">
+        
+        <el-tab-pane>
+          <template #label><span class="tab-label">📁 本地文档</span></template>
+          <div class="connector-panel">
+            <h3>上传本地文件</h3>
+            <p class="panel-desc">支持 PDF, Word, Excel, PPT 等格式。PDF 将由 VLM 解析视觉元素，Office 文件由 MarkItDown 转换为 Markdown。</p>
+            <el-upload
+              class="upload-demo" drag multiple
+              action="http://localhost:8000/api/v1/documents/upload"
+              :on-success="handleUploadSuccess"
+              :on-error="handleUploadError"
+              accept=".pdf,.docx,.xlsx,.pptx,.csv,.md"
+            >
+              <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+              <div class="el-upload__text">将文件拖到此处，或 <em>点击上传</em></div>
+            </el-upload>
           </div>
-        </template>
-      </el-upload>
+        </el-tab-pane>
+
+        <el-tab-pane>
+          <template #label><span class="tab-label">🕊️ 飞书文档</span></template>
+          <div class="connector-panel">
+            <h3>绑定飞书云文档 (Lark)</h3>
+            <p class="panel-desc">配置企业自建应用凭证，通过定时任务 (Cron) 自动同步指定云文档目录内容。</p>
+            <el-form label-position="top">
+              <el-form-item label="App ID"><el-input placeholder="cli_a4b3..." /></el-form-item>
+              <el-form-item label="App Secret"><el-input placeholder="输入应用密钥" type="password" show-password /></el-form-item>
+              <el-form-item label="根目录 Folder Token"><el-input placeholder="fldcn..." /></el-form-item>
+              <el-button type="primary" class="full-width-btn">建立飞书连接 (WebHook)</el-button>
+            </el-form>
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane>
+          <template #label><span class="tab-label">📘 Confluence</span></template>
+          <div class="connector-panel">
+            <h3>接入 Confluence 知识库</h3>
+            <p class="panel-desc">输入 Space 标识，后台 Airbyte 引擎将抓取页面并保持增量更新。</p>
+            <el-form label-position="top">
+              <el-form-item label="Base URL"><el-input placeholder="https://your-domain.atlassian.net/wiki" /></el-form-item>
+              <el-form-item label="Space Key"><el-input placeholder="例如: ENG, HR, ARCH" /></el-form-item>
+              <el-form-item label="API Token"><el-input placeholder="Atlassian Personal Access Token" type="password" show-password /></el-form-item>
+              <el-button type="primary" class="full-width-btn">开始全量同步</el-button>
+            </el-form>
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane>
+          <template #label><span class="tab-label">🛠️ Jira 缺陷跟踪</span></template>
+          <div class="connector-panel">
+            <h3>接入 Jira Issue</h3>
+            <p class="panel-desc">让大模型学习历史 Bug 修复方案，遇到报错时可直接检索内部经验。</p>
+            <el-form label-position="top">
+              <el-form-item label="Project Key"><el-input placeholder="例如: NEXUS, PLATFORM" /></el-form-item>
+              <el-form-item label="JQL 过滤条件 (可选)"><el-input placeholder="status = Done AND resolution = Fixed" /></el-form-item>
+              <el-button type="primary" class="full-width-btn">同步 Issue 数据</el-button>
+            </el-form>
+          </div>
+        </el-tab-pane>
+        
+      </el-tabs>
     </el-dialog>
   </div>
 </template>
@@ -138,4 +159,51 @@ const handleUploadError = () => {
   border-left: 3px solid #3b82f6;
 }
 .text-center { text-align: center; margin-top: 8px; color: #eab308; }
+
+:deep(.custom-connector-dialog .el-dialog__body) {
+  padding: 0; /* 移除默认 padding，让 tabs 撑满 */
+}
+
+.connector-tabs {
+  height: 450px;
+}
+
+:deep(.el-tabs--left .el-tabs__header.is-left) {
+  margin-right: 0;
+  background-color: #f8fafc;
+  width: 160px;
+}
+
+.tab-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.connector-panel {
+  padding: 24px;
+  height: 450px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.connector-panel h3 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  color: #1e293b;
+}
+
+.panel-desc {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.full-width-btn {
+  width: 100%;
+  margin-top: 12px;
+}
 </style>
