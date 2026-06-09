@@ -1,28 +1,30 @@
 <template>
   <div class="chat-container">
+    <div class="studio-pure-bg"></div>
+
     <header class="chat-header">
       <div class="header-left">
-        <h2>Nexus Agentic RAG</h2>
-        <el-tag type="success" effect="light" round size="small">M4 Pro Engine Online</el-tag>
+        <h2>Nexus <span class="brand-text">Engine</span></h2>
+        <el-tag type="info" effect="dark" round size="small" class="status-tag">
+          <span class="pulse-dot"></span> M4 Pro Node Active
+        </el-tag>
       </div>
       <div class="header-right">
-        <el-button type="danger" plain size="small" @click="chatStore.clearChat">
+        <el-button class="clear-btn" plain size="small" @click="chatStore.createNewChat">
           <el-icon><Delete /></el-icon> 清空会话
         </el-button>
       </div>
     </header>
 
-    <el-scrollbar ref="scrollbarRef" class="chat-main" always>
+    <el-scrollbar ref="scrollbarRef" class="chat-main" always @scroll="handleScroll">
       <div class="message-list">
         <div 
           v-for="(msg, index) in chatStore.messages" 
           :key="index"
           :class="['message-row', msg.role === 'user' ? 'user-row' : 'ai-row']"
         >
-          <div class="avatar">
-            <el-avatar :size="40" :style="{ background: msg.role === 'user' ? '#3b82f6' : '#10b981' }">
-              {{ msg.role === 'user' ? 'U' : 'AI' }}
-            </el-avatar>
+          <div class="avatar" v-if="msg.role !== 'user'">
+            <div class="ai-avatar-core">N</div>
           </div>
           
           <div class="bubble">
@@ -35,7 +37,6 @@
                 v-if="chatStore.isGenerating && index === chatStore.messages.length - 1" 
                 :traces="chatStore.agentTraces" 
               />
-              
               <MarkdownView v-if="msg.content" :content="msg.content" :sources="msg.sources" />
             </template>
           </div>
@@ -44,27 +45,29 @@
     </el-scrollbar>
 
     <footer class="chat-footer">
-      <div class="input-wrapper">
+      <div class="input-wrapper studio-input-area">
         <el-input
           v-model="userInput"
           type="textarea"
           :autosize="{ minRows: 1, maxRows: 6 }"
-          placeholder="向 Nexus 提问... (Enter 发送，Shift + Enter 换行)"
+          placeholder="向 Nexus 智能体中枢提问..."
           @keydown="handleKeydown"
           :disabled="chatStore.isGenerating"
           resize="none"
           class="custom-el-input"
         />
         <el-button 
-          type="primary" 
+          color="#18181b"
           :loading="chatStore.isGenerating" 
           :disabled="!userInput.trim()"
           @click="handleSend"
           class="send-btn"
+          circle
         >
-          发送 <el-icon class="el-icon--right"><Position /></el-icon>
+          <el-icon :size="16" v-if="!chatStore.isGenerating"><Position /></el-icon>
         </el-button>
       </div>
+      <div class="footer-copy">Nexus Agentic RAG Platform • Professional Data Grid Engine</div>
     </footer>
   </div>
 </template>
@@ -75,39 +78,44 @@ import { useChatStore } from '../stores/chatStore'
 import { useSSE } from '../composables/useSSE'
 import MarkdownView from '../components/chat/MarkdownView.vue'
 import TraceTimeline from '../components/chat/TraceTimeline.vue'
-import { Loading, Position, Delete } from '@element-plus/icons-vue'
+import { Position, Delete } from '@element-plus/icons-vue'
 
 const chatStore = useChatStore()
 const { sendMessage } = useSSE()
 
 const userInput = ref('')
 const scrollbarRef = ref(null)
+const isAutoScrolling = ref(true)
 
-// 处理回车发送与 Shift+Enter 换行
 const handleKeydown = (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault() // 阻止默认的回车换行行为
+    e.preventDefault()
     handleSend()
   }
 }
 
 const handleSend = () => {
   if (!userInput.value.trim() || chatStore.isGenerating) return
+  isAutoScrolling.value = true
   sendMessage(userInput.value)
   userInput.value = ''
 }
 
-// 自动滚动到底部逻辑 (适配 el-scrollbar)
+const handleScroll = ({ scrollTop }) => {
+  const wrap = scrollbarRef.value?.wrapRef
+  if (wrap) {
+    const distanceToBottom = wrap.scrollHeight - scrollTop - wrap.clientHeight
+    isAutoScrolling.value = distanceToBottom <= 40
+  }
+}
+
 watch(
   () => chatStore.messages,
   async () => {
     await nextTick()
-    if (scrollbarRef.value) {
-      // 获取 scrollbar 内部的滚动容器，并滚动到底部
+    if (isAutoScrolling.value && scrollbarRef.value) {
       const wrap = scrollbarRef.value.wrapRef
-      if (wrap) {
-        wrap.scrollTop = wrap.scrollHeight
-      }
+      if (wrap) wrap.scrollTop = wrap.scrollHeight
     }
   },
   { deep: true }
@@ -119,111 +127,96 @@ watch(
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-color: #f8fafc;
+  position: relative;
+  background-color: #fcfcfd;
+  overflow: hidden;
+}
+
+/* 优雅的微弱质感画布背景 */
+.studio-pure-bg {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(at 50% 0%, #f4f4f5 0%, #fcfcfd 100%);
 }
 
 .chat-header {
-  padding: 16px 24px;
-  background: white;
-  border-bottom: 1px solid #e2e8f0;
+  padding: 14px 32px;
+  background: #ffffff;
+  border-bottom: 1px solid #efeff1;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
   z-index: 10;
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.header-left h2 { margin: 0; font-size: 20px; color: #1e293b; }
+.header-left h2 { margin: 0; font-size: 18px; color: #18181b; font-weight: 700; letter-spacing: -0.3px; }
+.brand-text { background: linear-gradient(135deg, #2563eb, #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
-.chat-main {
-  flex: 1;
-  background: #f8fafc;
-}
+.status-tag { background: #18181b; border: none; display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.pulse-dot { width: 6px; height: 6px; background-color: #10b981; border-radius: 50%; box-shadow: 0 0 6px #10b981; }
 
-.message-list {
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  max-width: 1000px; /* 限制最大宽度，提升大屏阅读体验 */
-  margin: 0 auto;
-}
+.clear-btn { background: #ffffff; border: 1px solid #e4e4e7; color: #71717a; border-radius: 8px; font-weight: 500; }
+.clear-btn:hover { background: #f4f4f5; color: #e11d48; border-color: #f4f4f5; }
 
-.message-row {
-  display: flex;
-  gap: 16px;
-  max-width: 90%;
+.chat-main { flex: 1; z-index: 1; }
+.message-list { padding: 40px 24px; display: flex; flex-direction: column; gap: 32px; max-width: 840px; margin: 0 auto; }
+.message-row { display: flex; gap: 16px; width: 100%; }
+.user-row { justify-content: flex-end; }
+.ai-row { justify-content: flex-start; }
+
+/* 极其专业的 AI 品牌头像 */
+.ai-avatar-core {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: #18181b; color: #ffffff;
+  display: flex; justify-content: center; align-items: center;
+  font-weight: 700; font-family: monospace; font-size: 14px;
 }
 
-.user-row {
-  align-self: flex-end;
-  flex-direction: row-reverse;
-}
+.bubble { max-width: 100%; }
 
-.ai-row {
-  align-self: flex-start;
-}
-
-.bubble {
-  padding: 16px 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-  line-height: 1.6;
-  font-size: 15px;
-}
-
+/* 🚨 颠覆重构：用户气泡对齐大厂的浅冷灰风，极度高级 */
 .user-row .bubble {
-  background-color: #ecf5ff; /* Element Plus 的浅蓝色 */
-  color: #409eff;
-  border-top-right-radius: 2px;
-  border: 1px solid #d9ecff;
+  background-color: #f4f4f5;
+  color: #18181b;
+  padding: 12px 18px;
+  border-radius: 14px;
+  font-size: 14.5px;
+  font-weight: 400;
+  border: 1px solid #e4e4e7;
+  max-width: 75%;
 }
 
+/* 🚨 颠覆重构：AI 气泡成为独立的精致高白实体画布，完美包裹图表 */
 .ai-row .bubble {
-  background-color: white;
-  border-top-left-radius: 2px;
-  border: 1px solid #e2e8f0;
-  min-width: 200px;
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  width: 100%;
 }
 
-.chat-footer {
-  padding: 20px 24px;
-  background: white;
-  border-top: 1px solid #e2e8f0;
-}
+.chat-footer { padding: 0 24px 20px 24px; background: transparent; z-index: 10; }
 
-.input-wrapper {
-  max-width: 1000px;
-  margin: 0 auto;
-  display: flex;
-  align-items: flex-end; /* 让按钮和输入框底部对齐 */
-  gap: 16px;
+/* 药丸型专业级输入框框体 */
+.studio-input-area {
+  max-width: 800px; margin: 0 auto;
+  background: #ffffff; border: 1px solid #e4e4e7; border-radius: 18px;
+  padding: 8px 10px 8px 18px; display: flex; align-items: flex-end;
+  box-shadow: 0 8px 24px -4px rgba(0,0,0,0.04);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
+.studio-input-area:focus-within { border-color: #a1a1aa; box-shadow: 0 8px 32px -4px rgba(0,0,0,0.08); }
 
-/* 穿透修改 Element Plus 内部样式，去掉难看的边框，使其融入极客风格 */
 :deep(.custom-el-input .el-textarea__inner) {
-  background-color: #f1f5f9;
-  border: none;
-  box-shadow: none !important;
-  font-size: 15px;
-  padding: 12px 16px;
-  border-radius: 12px;
+  background-color: transparent; border: none; box-shadow: none !important;
+  font-size: 14.5px; padding: 8px 0; color: #18181b; resize: none; line-height: 1.5;
 }
+:deep(.custom-el-input .el-textarea__inner::placeholder) { color: #a1a1aa; }
 
-:deep(.custom-el-input .el-textarea__inner:focus) {
-  background-color: #fff;
-  box-shadow: 0 0 0 1px #409eff !important;
-}
+.send-btn { width: 34px; height: 34px; flex-shrink: 0; margin-bottom: 2px; border: none; }
 
-.send-btn {
-  height: 46px; /* 固定按钮高度 */
-  padding: 0 24px;
-  border-radius: 12px;
-  font-weight: bold;
-}
+.footer-copy { text-align: center; font-size: 11px; color: #a1a1aa; margin-top: 10px; font-weight: 500; }
 </style>
