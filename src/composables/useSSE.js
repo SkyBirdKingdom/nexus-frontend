@@ -1,6 +1,7 @@
 import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
 import { ElMessage } from 'element-plus'
+import { API_BASE_URL } from '../api/index'
 
 export function useSSE() {
   const chatStore = useChatStore()
@@ -19,7 +20,7 @@ export function useSSE() {
 
     try {
       // 3. 发起原生 Fetch 请求对接后端的双路流生成器
-      const response = await fetch('http://localhost:8000/api/v1/chat', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/chat`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

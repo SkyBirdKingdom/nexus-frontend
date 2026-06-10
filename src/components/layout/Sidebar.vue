@@ -70,6 +70,7 @@ import { useChatStore } from '../../stores/chatStore'
 import { useAuthStore } from '../../stores/authStore'
 import { Plus, ChatDotRound, Setting, UploadFilled, SwitchButton } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { API_BASE_URL } from '../../api/index'
 
 const chatStore = useChatStore()
 const authStore = useAuthStore()
@@ -79,8 +80,7 @@ const kbDialogVisible = ref(false)
 // 🚨 工程化改造：动态获取 API 地址与安全凭证
 // ==========================================
 // 从环境变量读取接口基础路径，开发环境下默认回退到 localhost:8000
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-const uploadUrl = `${apiBaseUrl}/api/v1/documents/upload`
+const uploadUrl = `${API_BASE_URL}/api/v1/documents/upload`
 
 // 动态计算上传的 Headers，注入鉴权 Token
 const uploadHeaders = computed(() => {

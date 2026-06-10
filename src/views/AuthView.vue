@@ -42,6 +42,7 @@
 import { ref, reactive } from 'vue'
 import { useAuthStore } from '../stores/authStore'
 import { ElMessage } from 'element-plus'
+import { authApi } from '../api/index'
 
 const authStore = useAuthStore()
 const isLogin = ref(true)
@@ -56,40 +57,20 @@ const handleSubmit = async () => {
   loading.value = true
   try {
     if (isLogin.value) {
-      // 🚨 架构黑魔法：FastAPI 的 OAuth2 协议强制要求表单数据 (x-www-form-urlencoded)
-      const formData = new URLSearchParams()
-      formData.append('username', form.username)
-      formData.append('password', form.password)
-
-      const response = await fetch('http://localhost:8000/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formData
-      })
-      
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.detail || '登录失败')
-      
+      // 🚨 大厂写法：不写 url，不写 fetch，一行代码搞定登录
+      const data = await authApi.login(form.username, form.password)
       authStore.setToken(data.access_token)
       ElMessage.success('身份验证通过，正在挂载沙箱...')
-      
     } else {
-      // 注册逻辑使用标准 JSON
-      const response = await fetch('http://localhost:8000/api/v1/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: form.username, password: form.password })
-      })
-      
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.detail || '注册失败')
-      
+      // 🚨 大厂写法：注册
+      await authApi.register(form.username, form.password)
       ElMessage.success('沙箱创建成功！请进行安全登录。')
-      isLogin.value = true // 注册成功后自动切回登录态
+      isLogin.value = true 
       form.password = ''
     }
   } catch (error) {
-    ElMessage.error(error.message)
+    // 错误已经在拦截器里通过 ElMessage 报过了，这里只需要捕获防止崩溃即可
+    console.log("Auth Failed") 
   } finally {
     loading.value = false
   }
