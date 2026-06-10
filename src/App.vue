@@ -1,7 +1,8 @@
 <template>
-  <div class="app-layout">
+  <AuthView v-if="!authStore.isAuthenticated" />
+  
+  <div v-else class="app-layout">
     <Sidebar />
-    
     <div class="main-workspace">
       <ChatWorkspace />
     </div>
@@ -11,34 +12,20 @@
 <script setup>
 import Sidebar from './components/layout/Sidebar.vue'
 import ChatWorkspace from './views/ChatWorkspace.vue'
+import AuthView from './views/AuthView.vue'
+import { useAuthStore } from './stores/authStore'
+
+// 获取全局鉴权状态
+const authStore = useAuthStore()
 </script>
 
 <style>
-/* 极其轻量的全局 CSS 重置 */
 body, html {
-  margin: 0;
-  padding: 0;
-  height: 100%;
+  margin: 0; padding: 0; height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background-color: #f8fafc;
+  background-color: #fcfcfd;
 }
-
-#app {
-  height: 100%;
-}
-
-/* 核心布局：Flexbox 将侧边栏和工作台并排 */
-.app-layout {
-  display: flex;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-}
-
-.main-workspace {
-  flex: 1;
-  min-width: 0; /* 防止内容撑破 Flex 容器 */
-  display: flex;
-  flex-direction: column;
-}
+#app { height: 100%; }
+.app-layout { display: flex; width: 100vw; height: 100vh; overflow: hidden; }
+.main-workspace { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 </style>

@@ -25,12 +25,14 @@
     </div>
 
     <div class="sidebar-footer" @click="kbDialogVisible = true">
-      <div class="user-avatar-glow">A</div>
+      <div class="user-avatar-glow">N</div>
       <div class="user-info">
-        <span class="user-name">Nexus Admin</span>
+        <span class="user-name">Nexus User</span>
         <span class="user-role">数据中枢 (Ingestion)</span>
       </div>
-      <el-icon class="settings-icon"><Setting /></el-icon>
+      <el-icon class="settings-icon logout-icon" title="安全锁定沙箱" @click.stop="handleLogout">
+        <SwitchButton />
+      </el-icon>
     </div>
 
     <el-dialog v-model="kbDialogVisible" title="Nexus 多模态数据摄取中心" width="700px" destroy-on-close class="studio-dialog custom-connector-dialog">
@@ -40,10 +42,21 @@
           <div class="connector-panel">
             <h3>上传本地文件</h3>
             <p class="panel-desc">支持 PDF, Word, Excel 等格式进行深度 RAG 解析。</p>
-            <el-upload class="upload-demo" drag multiple action="http://localhost:8000/api/v1/documents/upload" accept=".pdf,.docx,.xlsx,.csv,.md">
+            
+            <el-upload 
+              class="upload-demo" 
+              drag 
+              multiple 
+              :action="uploadUrl" 
+              :headers="uploadHeaders"
+              :on-success="handleUploadSuccess"
+              :on-error="handleUploadError"
+              accept=".pdf,.docx,.xlsx,.csv,.md"
+            >
               <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
               <div class="el-upload__text">将文件拖到此处，或 <em>点击上传</em></div>
             </el-upload>
+            
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -52,18 +65,62 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useChatStore } from '../../stores/chatStore'
-import { Plus, ChatDotRound, Setting, UploadFilled } from '@element-plus/icons-vue'
+import { useAuthStore } from '../../stores/authStore'
+import { Plus, ChatDotRound, Setting, UploadFilled, SwitchButton } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 
 const chatStore = useChatStore()
+const authStore = useAuthStore()
 const kbDialogVisible = ref(false)
+
+// ==========================================
+// 🚨 工程化改造：动态获取 API 地址与安全凭证
+// ==========================================
+// 从环境变量读取接口基础路径，开发环境下默认回退到 localhost:8000
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const uploadUrl = `${apiBaseUrl}/api/v1/documents/upload`
+
+// 动态计算上传的 Headers，注入鉴权 Token
+const uploadHeaders = computed(() => {
+  return {
+    Authorization: `Bearer ${authStore.token}`
+  }
+})
+
+// ==========================================
+// 交互与回调处理
+// ==========================================
+const handleLogout = () => {
+  authStore.logout()
+}
+
+const handleUploadSuccess = (response) => {
+  if (response.code === 200) {
+    ElMessage.success({
+      message: response.message || '文件已进入个人沙箱进行解析！',
+      duration: 5000
+    })
+  } else {
+    ElMessage.error(response.message || '上传处理异常')
+  }
+}
+
+const handleUploadError = (err) => {
+  if (err.status === 401) {
+    ElMessage.error('鉴权失效，请重新登录！')
+    authStore.logout()
+  } else {
+    ElMessage.error('网络错误或服务器无响应。')
+  }
+}
 </script>
 
 <style scoped>
 /* 🚀 专属品牌：深邃宇宙黑侧边栏 */
 .sidebar-container { 
-  width: 280px; height: 100vh; background-color: #020617; /* 极致的深蓝黑 */
+  width: 280px; height: 100vh; background-color: #020617;
   display: flex; flex-direction: column; color: #f8fafc; flex-shrink: 0;
   border-right: 1px solid rgba(255,255,255,0.05);
 }
@@ -107,26 +164,23 @@ const kbDialogVisible = ref(false)
 .user-info { display: flex; flex-direction: column; flex: 1; }
 .user-name { font-size: 13px; font-weight: 600; color: #f8fafc; }
 .user-role { font-size: 11px; color: #64748b; margin-top: 2px;}
-.settings-icon { color: #64748b; }
 
+.settings-icon { color: #64748b; transition: all 0.2s; }
+.logout-icon:hover { color: #ef4444; transform: scale(1.1); }
 </style>
 
 <style>
 /* ==========================================
    🚨 全局挂载：Nexus 专属深空科技风 Dialog 样式
-   由于 el-dialog 挂载在 body 下，必须使用非 scoped 样式拦截
    ========================================== */
-/* 弹窗主体容器：极净白 + 柔和的弥散阴影 */
 .studio-dialog.el-dialog {
   background-color: #ffffff !important;
   border-radius: 16px;
   border: 1px solid #e4e4e7;
-  /* 极其昂贵的阴影质感，只有大厂才会这么配参数 */
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.02) !important;
   overflow: hidden;
 }
 
-/* 弹窗标题栏 */
 .studio-dialog .el-dialog__header {
   border-bottom: 1px solid #f4f4f5;
   margin-right: 0;
@@ -146,7 +200,6 @@ const kbDialogVisible = ref(false)
 }
 .studio-dialog .el-dialog__headerbtn:hover .el-dialog__close { color: #18181b; }
 
-/* 左侧 Tabs 导航区：浅灰底色作为视觉层级分割 */
 .studio-dialog .el-tabs--left .el-tabs__header.is-left {
   background-color: #fafafa;
   border-right: 1px solid #f4f4f5;
@@ -163,31 +216,23 @@ const kbDialogVisible = ref(false)
 }
 .studio-dialog .el-tabs__item:hover { color: #18181b; background: #f4f4f5; }
 .studio-dialog .el-tabs__item.is-active {
-  color: #2563eb; /* 核心品牌学术蓝 */
+  color: #2563eb; 
   background-color: #ffffff;
   font-weight: 600;
 }
-/* 取消默认的蓝色下划线，改用左侧或完全隐藏 */
 .studio-dialog .el-tabs__active-bar { display: none; }
 
-/* 右侧内容面板 */
 .studio-dialog .connector-panel {
   background-color: #ffffff;
   padding: 28px 36px;
 }
 .studio-dialog .connector-panel h3 { 
-  color: #18181b; 
-  font-weight: 600; 
-  font-size: 15px; 
-  margin-bottom: 6px; 
+  color: #18181b; font-weight: 600; font-size: 15px; margin-bottom: 6px; 
 }
 .studio-dialog .panel-desc { 
-  color: #71717a; 
-  font-size: 13.5px; 
-  line-height: 1.6;
+  color: #71717a; font-size: 13.5px; line-height: 1.6;
 }
 
-/* 拖拽上传组件精细化定制 */
 .studio-dialog .el-upload-dragger {
   background-color: #fafafa;
   border: 1px dashed #e4e4e7;
@@ -197,43 +242,11 @@ const kbDialogVisible = ref(false)
 }
 .studio-dialog .el-upload-dragger:hover {
   border-color: #2563eb;
-  background-color: #eff6ff; /* 极浅的焦点蓝 */
+  background-color: #eff6ff; 
 }
 .studio-dialog .el-upload__text { color: #71717a; font-size: 13.5px; margin-top: 12px; }
 .studio-dialog .el-upload__text em { color: #2563eb; font-weight: 600; font-style: normal; }
 .studio-dialog .el-icon--upload { color: #a1a1aa; font-size: 48px; transition: color 0.2s; }
 .studio-dialog .el-upload-dragger:hover .el-icon--upload { color: #2563eb; }
 
-/* 表单输入框极简适配 */
-.studio-dialog .el-form-item__label { color: #3f3f46; font-weight: 500; padding-bottom: 4px; }
-.studio-dialog .el-input__wrapper {
-  background-color: #ffffff;
-  box-shadow: 0 0 0 1px #e4e4e7 inset;
-  border-radius: 8px;
-  padding: 4px 12px;
-  transition: all 0.2s;
-}
-.studio-dialog .el-input__wrapper:hover { box-shadow: 0 0 0 1px #d4d4d8 inset; }
-.studio-dialog .el-input__wrapper.is-focus {
-  box-shadow: 0 0 0 1px #2563eb inset !important;
-  background-color: #ffffff;
-}
-.studio-dialog .el-input__inner { color: #18181b; }
-.studio-dialog .el-input__inner::placeholder { color: #a1a1aa; }
-
-/* 按钮高级质感：纯黑克制风 */
-.studio-dialog .el-button--primary {
-  background: #18181b;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  color: #ffffff;
-  height: 38px;
-  transition: all 0.2s;
-}
-.studio-dialog .el-button--primary:hover {
-  background: #27272a;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transform: translateY(-1px);
-}
 </style>

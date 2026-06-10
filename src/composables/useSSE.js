@@ -1,7 +1,10 @@
 import { useChatStore } from '../stores/chatStore'
+import { useAuthStore } from '../stores/authStore'
+import { ElMessage } from 'element-plus'
 
 export function useSSE() {
   const chatStore = useChatStore()
+  const authStore = useAuthStore()
 
   const sendMessage = async (userText) => {
     if (!userText.trim() || chatStore.isGenerating) return
@@ -18,12 +21,22 @@ export function useSSE() {
       // 3. 发起原生 Fetch 请求对接后端的双路流生成器
       const response = await fetch('http://localhost:8000/api/v1/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authStore.token}`
+        },
         body: JSON.stringify({ 
           message: userText,
           thread_id: chatStore.threadId
         })
       })
+
+      // 🚨 如果后端报 401，说明 Token 被篡改或过期，立刻踢回登录页
+      if (response.status === 401) {
+        authStore.logout()
+        ElMessage.error('鉴权已过期，请重新登录。')
+        return
+      }
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
 
