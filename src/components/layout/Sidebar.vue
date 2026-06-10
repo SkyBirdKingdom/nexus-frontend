@@ -20,6 +20,9 @@
             <span class="session-title">{{ session.title }}</span>
             <span class="session-date">{{ session.date }}</span>
           </div>
+          <el-icon class="delete-icon" @click.stop="chatStore.deleteSession(session.id)">
+            <Delete />
+          </el-icon>
         </div>
       </el-scrollbar>
     </div>
@@ -65,7 +68,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useChatStore } from '../../stores/chatStore'
 import { useAuthStore } from '../../stores/authStore'
 import { Plus, ChatDotRound, Setting, UploadFilled, SwitchButton } from '@element-plus/icons-vue'
@@ -87,6 +90,11 @@ const uploadHeaders = computed(() => {
   return {
     Authorization: `Bearer ${authStore.token}`
   }
+})
+
+// 🚨 挂载时立即拉取云端记忆
+onMounted(() => {
+  chatStore.fetchSessions()
 })
 
 // ==========================================
@@ -140,14 +148,27 @@ const handleUploadError = (err) => {
 .session-item { 
   display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 4px;
   cursor: pointer; border-radius: 10px; color: #94a3b8; transition: all 0.2s;
+  position: relative; /* 为悬浮图标定位 */
 }
 .session-item:hover { background-color: rgba(255,255,255,0.05); color: #f8fafc; }
 .session-item.active { background-color: rgba(56, 189, 248, 0.1); color: #38bdf8; }
 
 .session-icon { font-size: 16px; opacity: 0.8; }
-.session-info { display: flex; flex-direction: column; overflow: hidden; }
+.session-info { display: flex; flex-direction: column; flex: 1; overflow: hidden; } /* 🚨 加上 flex: 1 */
 .session-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session-date { font-size: 11px; color: #475569; margin-top: 4px; }
+
+/* 🚨 新增：删除图标样式 (默认隐藏，hover 时优雅浮现) */
+.delete-icon {
+  opacity: 0;
+  color: #ef4444;
+  font-size: 15px;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+.delete-icon:hover { background: rgba(239, 68, 68, 0.15); transform: scale(1.1); }
+.session-item:hover .delete-icon { opacity: 1; }
 
 /* 底部中枢 */
 .sidebar-footer { 

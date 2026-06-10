@@ -20,3 +20,17 @@ export const authApi = {
     return request.post('/api/v1/auth/register', { username, password })
   }
 }
+
+// 🚨 新增：聊天与会话 API 集合
+export const chatApi = {
+  getSessions() {
+    return request.get('/api/v1/chat/sessions')
+  },
+  deleteSession(threadId) {
+    return request.delete(`/api/v1/chat/sessions/${threadId}`)
+  },
+  // 🚨 新增：拉取全量历史状态树
+  getChatHistory(threadId) {
+    return request.get(`/api/v1/chat/history/${threadId}`)
+  }
+}

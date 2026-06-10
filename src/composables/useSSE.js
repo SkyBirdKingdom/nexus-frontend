@@ -59,6 +59,13 @@ export function useSSE() {
             const dataStr = line.slice(6).trim()
             if (dataStr === '[DONE]') {
               chatStore.isGenerating = false
+
+              // 🚨 核心联动：如果这是本沙箱的第一轮对话（只有一个用户消息），
+              // 意味着后端刚才异步生成了标题。静默刷新侧边栏列表！
+              const userMsgCount = chatStore.messages.filter(m => m.role === 'user').length
+              if (userMsgCount === 1) {
+                chatStore.fetchSessions()
+              }
               return
             }
 

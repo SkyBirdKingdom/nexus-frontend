@@ -1,31 +1,67 @@
+// src/stores/chatStore.js
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
+import { chatApi } from '../api/index'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 export const useChatStore = defineStore('chat', () => {
   const messages = ref([])
   const isGenerating = ref(false)
-  const threadId = ref('nexus_session_' + Date.now())
-  const agentTraces = ref([])
   
-  // 本地持久化的历史会话列表
-  const sessionList = ref(JSON.parse(localStorage.getItem('nexus_sessions') || '[]'))
+  // 🚨 路由初始化：优先从浏览器 URL 的 Hash (#/) 中读取会话 ID
+  const getInitialThreadId = () => {
+    const hash = window.location.hash
+    if (hash && hash.startsWith('#/chat/')) {
+      return hash.replace('#/chat/', '')
+    }
+    return 'nexus_session_' + Date.now()
+  }
+  
+  const threadId = ref(getInitialThreadId())
+  const agentTraces = ref([])
+  const sessionList = ref([])
 
-  // 监听会话列表变化并存入 localStorage
-  watch(sessionList, (newList) => {
-    localStorage.setItem('nexus_sessions', JSON.stringify(newList))
-  }, { deep: true })
+  // 同步 URL 状态
+  const updateUrlRoute = (id) => {
+    window.history.pushState(null, '', `#/chat/${id}`)
+  }
+
+  const fetchSessions = async () => {
+    try {
+      const res = await chatApi.getSessions()
+      sessionList.value = res.data || []
+      
+      // 🚨 如果当前 URL 中包含有效的历史 ID，且当前面板是空的，自动帮用户激活拉取
+      const currentHashId = window.location.hash.replace('#/chat/', '')
+      if (currentHashId && messages.value.length === 0 && sessionList.value.some(s => s.id === currentHashId)) {
+        switchChat(currentHashId)
+      }
+    } catch (e) {
+      console.error('拉取沙箱索引失败', e)
+    }
+  }
+
+  const deleteSession = async (id) => {
+    try {
+      await ElMessageBox.confirm('确定要抹除这个沙箱的全部记忆吗？此操作不可逆。', '安全警告', {
+        confirmButtonText: '确认抹除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      })
+      await chatApi.deleteSession(id)
+      ElMessage.success('沙箱记忆已被彻底抹除')
+      
+      if (threadId.value === id) {
+        createNewChat()
+      }
+      await fetchSessions()
+    } catch (e) {
+      if (e !== 'cancel') console.error('删除会话异常', e)
+    }
+  }
 
   const addMessage = (msg) => {
     messages.value.push(msg)
-    // 如果是用户的第一条消息，自动将当前会话保存到左侧历史列表中
-    if (messages.value.length === 1 && msg.role === 'user') {
-      const title = msg.content.substring(0, 15) + (msg.content.length > 15 ? '...' : '')
-      sessionList.value.unshift({
-        id: threadId.value,
-        title: title,
-        date: new Date().toLocaleDateString()
-      })
-    }
   }
 
   const appendToLastMessage = (chunk) => {
@@ -35,24 +71,36 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  // 新建对话
   const createNewChat = () => {
     if (isGenerating.value) return
     messages.value = []
     agentTraces.value = []
-    threadId.value = 'nexus_session_' + Date.now() // 生成全新的隔离 ID
+    threadId.value = 'nexus_session_' + Date.now()
+    updateUrlRoute(threadId.value)
   }
 
-  // 切换历史对话 (当前仅做纯前端 UI 切换，后续可对接后端加载历史记录)
-  const switchChat = (id) => {
-    if (isGenerating.value || threadId.value === id) return
+  // 🚨 满血复活：真实拉取云端对话数据
+  const switchChat = async (id) => {
+    if (isGenerating.value) return
     threadId.value = id
+    updateUrlRoute(id)
+    
     messages.value = []
     agentTraces.value = []
-    messages.value.push({ 
-      role: 'ai', 
-      content: '> 💡 **系统提示**: 已切换到历史会话 `'+id+'`。\n\n后端 LangGraph 的 SqliteSaver 已保留此会话的记忆上下文。您可以继续提问！' 
-    })
+    
+    try {
+      const res = await chatApi.getChatHistory(id)
+      if (res.data && res.data.length > 0) {
+        messages.value = res.data
+      } else {
+        messages.value.push({ 
+          role: 'ai', 
+          content: '> 💡 **系统提示**: 该沙箱虽然在索引中，但 LangGraph 记忆树为空，可能处于初始化状态。' 
+        })
+      }
+    } catch (e) {
+      ElMessage.error('加载历史沙箱记忆失败')
+    }
   }
 
   return {
@@ -61,6 +109,8 @@ export const useChatStore = defineStore('chat', () => {
     threadId,
     agentTraces,
     sessionList,
+    fetchSessions,
+    deleteSession,
     addMessage,
     appendToLastMessage,
     createNewChat,
