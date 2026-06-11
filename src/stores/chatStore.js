@@ -8,7 +8,7 @@ export const useChatStore = defineStore('chat', () => {
   const messages = ref([])
   const isGenerating = ref(false)
   
-  // 🚨 路由初始化：优先从浏览器 URL 的 Hash (#/) 中读取会话 ID
+  // 1. 路由初始化读取
   const getInitialThreadId = () => {
     const hash = window.location.hash
     if (hash && hash.startsWith('#/chat/')) {
@@ -21,20 +21,32 @@ export const useChatStore = defineStore('chat', () => {
   const agentTraces = ref([])
   const sessionList = ref([])
 
-  // 同步 URL 状态
+  // 同步修改浏览器地址栏的 Hash
   const updateUrlRoute = (id) => {
     window.history.pushState(null, '', `#/chat/${id}`)
   }
 
+  // 🚨 2. 核心重构：拉取云端会话并加入【路由鉴权守卫】
   const fetchSessions = async () => {
     try {
       const res = await chatApi.getSessions()
       sessionList.value = res.data || []
       
-      // 🚨 如果当前 URL 中包含有效的历史 ID，且当前面板是空的，自动帮用户激活拉取
       const currentHashId = window.location.hash.replace('#/chat/', '')
-      if (currentHashId && messages.value.length === 0 && sessionList.value.some(s => s.id === currentHashId)) {
-        switchChat(currentHashId)
+      
+      if (currentHashId && currentHashId.trim() !== '') {
+        // 🛡️ 安全拦截守卫：检查当前的 Hash ID 是否在刚拉取下来的属于新用户的列表中
+        if (sessionList.value.some(s => s.id === currentHashId)) {
+          // 合法历史记忆，安全反序列化
+          switchChat(currentHashId)
+        } else {
+          // 🚨 发现越权或旧用户的垃圾残留 Hash！果断熔断拒绝，强制开辟新空间
+          console.warn('嗅探到非法或残留的路由会话，已安全重置空间。')
+          createNewChat()
+        }
+      } else {
+        // URL 干净时，默认行为
+        createNewChat()
       }
     } catch (e) {
       console.error('拉取沙箱索引失败', e)
@@ -79,7 +91,6 @@ export const useChatStore = defineStore('chat', () => {
     updateUrlRoute(threadId.value)
   }
 
-  // 🚨 满血复活：真实拉取云端对话数据
   const switchChat = async (id) => {
     if (isGenerating.value) return
     threadId.value = id
@@ -92,15 +103,19 @@ export const useChatStore = defineStore('chat', () => {
       const res = await chatApi.getChatHistory(id)
       if (res.data && res.data.length > 0) {
         messages.value = res.data
-      } else {
-        messages.value.push({ 
-          role: 'ai', 
-          content: '> 💡 **系统提示**: 该沙箱虽然在索引中，但 LangGraph 记忆树为空，可能处于初始化状态。' 
-        })
       }
     } catch (e) {
       ElMessage.error('加载历史沙箱记忆失败')
     }
+  }
+
+  // 🚨 3. 核心新增：企业级内存断路器 (登出时被调用，斩断全部状态)
+  const clearAllState = () => {
+    messages.value = []
+    agentTraces.value = []
+    sessionList.value = []
+    threadId.value = 'nexus_session_' + Date.now()
+    window.location.hash = '' // 抹平 URL 残留
   }
 
   return {
@@ -114,6 +129,7 @@ export const useChatStore = defineStore('chat', () => {
     addMessage,
     appendToLastMessage,
     createNewChat,
-    switchChat
+    switchChat,
+    clearAllState // 🚨 暴露给登出逻辑调用
   }
 })

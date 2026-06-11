@@ -23,7 +23,7 @@
           :key="index"
           :class="['message-row', msg.role === 'user' ? 'user-row' : 'ai-row']"
         >
-          <div class="avatar" v-if="msg.role !== 'user'">
+          <div class="avatar-col" v-if="msg.role !== 'user'">
             <div class="ai-avatar-core">N</div>
           </div>
           
@@ -40,6 +40,13 @@
               <MarkdownView v-if="msg.content" :content="msg.content" :sources="msg.sources" />
             </template>
           </div>
+
+          <div class="avatar-col" v-if="msg.role === 'user'">
+            <div class="user-avatar-core">
+              {{ authStore.currentUser?.username?.charAt(0).toUpperCase() || 'U' }}
+            </div>
+          </div>
+
         </div>
       </div>
     </el-scrollbar>
@@ -62,9 +69,9 @@
           :disabled="!userInput.trim()"
           @click="handleSend"
           class="send-btn"
+          :icon="Position"
           circle
         >
-          <el-icon :size="16" v-if="!chatStore.isGenerating"><Position /></el-icon>
         </el-button>
       </div>
       <div class="footer-copy">Nexus Agentic RAG Platform • Professional Data Grid Engine</div>
@@ -75,12 +82,14 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
 import { useChatStore } from '../stores/chatStore'
+import { useAuthStore } from '../stores/authStore' // 🚨 引入鉴权库
 import { useSSE } from '../composables/useSSE'
 import MarkdownView from '../components/chat/MarkdownView.vue'
 import TraceTimeline from '../components/chat/TraceTimeline.vue'
 import { Position, Delete } from '@element-plus/icons-vue'
 
 const chatStore = useChatStore()
+const authStore = useAuthStore() // 🚨 初始化
 const { sendMessage } = useSSE()
 
 const userInput = ref('')
@@ -132,23 +141,15 @@ watch(
   overflow: hidden;
 }
 
-/* 优雅的微弱质感画布背景 */
 .studio-pure-bg {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 0;
-  pointer-events: none;
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 0; pointer-events: none;
   background: radial-gradient(at 50% 0%, #f4f4f5 0%, #fcfcfd 100%);
 }
 
 .chat-header {
-  padding: 14px 32px;
-  background: #ffffff;
-  border-bottom: 1px solid #efeff1;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  z-index: 10;
+  padding: 14px 32px; background: #ffffff; border-bottom: 1px solid #efeff1;
+  display: flex; justify-content: space-between; align-items: center; z-index: 10;
 }
 
 .header-left h2 { margin: 0; font-size: 18px; color: #18181b; font-weight: 700; letter-spacing: -0.3px; }
@@ -166,7 +167,9 @@ watch(
 .user-row { justify-content: flex-end; }
 .ai-row { justify-content: flex-start; }
 
-/* 极其专业的 AI 品牌头像 */
+.avatar-col { flex-shrink: 0; }
+
+/* AI 品牌头像 */
 .ai-avatar-core {
   width: 32px; height: 32px; border-radius: 8px;
   background: #18181b; color: #ffffff;
@@ -174,38 +177,34 @@ watch(
   font-weight: 700; font-family: monospace; font-size: 14px;
 }
 
-.bubble { max-width: 100%; }
-
-/* 🚨 颠覆重构：用户气泡对齐大厂的浅冷灰风，极度高级 */
-.user-row .bubble {
-  background-color: #f4f4f5;
-  color: #18181b;
-  padding: 12px 18px;
-  border-radius: 14px;
-  font-size: 14.5px;
-  font-weight: 400;
+/* 🚨 新增：大厂极简冷灰风用户头像 */
+.user-avatar-core {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: #f4f4f5; color: #18181b;
+  display: flex; justify-content: center; align-items: center;
+  font-weight: 700; font-family: monospace; font-size: 14px;
   border: 1px solid #e4e4e7;
-  max-width: 75%;
 }
 
-/* 🚨 颠覆重构：AI 气泡成为独立的精致高白实体画布，完美包裹图表 */
+.bubble { max-width: 100%; }
+
+.user-row .bubble {
+  background-color: #f4f4f5; color: #18181b; padding: 12px 18px;
+  border-radius: 14px; font-size: 14.5px; font-weight: 400;
+  border: 1px solid #e4e4e7; max-width: 75%;
+}
+
 .ai-row .bubble {
-  background: #ffffff;
-  border: 1px solid #e4e4e7;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  background: #ffffff; border: 1px solid #e4e4e7; border-radius: 16px;
+  padding: 24px; box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
   width: 100%;
 }
 
 .chat-footer { padding: 0 24px 20px 24px; background: transparent; z-index: 10; }
 
-/* 药丸型专业级输入框框体 */
 .studio-input-area {
-  max-width: 800px; margin: 0 auto;
-  background: #ffffff; border: 1px solid #e4e4e7; border-radius: 18px;
-  padding: 8px 10px 8px 18px; display: flex; align-items: flex-end;
-  box-shadow: 0 8px 24px -4px rgba(0,0,0,0.04);
+  max-width: 800px; margin: 0 auto; background: #ffffff; border: 1px solid #e4e4e7; border-radius: 18px;
+  padding: 8px 10px 8px 18px; display: flex; align-items: flex-end; box-shadow: 0 8px 24px -4px rgba(0,0,0,0.04);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .studio-input-area:focus-within { border-color: #a1a1aa; box-shadow: 0 8px 32px -4px rgba(0,0,0,0.08); }
@@ -217,6 +216,5 @@ watch(
 :deep(.custom-el-input .el-textarea__inner::placeholder) { color: #a1a1aa; }
 
 .send-btn { width: 34px; height: 34px; flex-shrink: 0; margin-bottom: 2px; border: none; }
-
 .footer-copy { text-align: center; font-size: 11px; color: #a1a1aa; margin-top: 10px; font-weight: 500; }
 </style>

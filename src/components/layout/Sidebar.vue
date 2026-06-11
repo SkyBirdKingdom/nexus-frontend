@@ -28,10 +28,12 @@
     </div>
 
     <div class="sidebar-footer" @click="kbDialogVisible = true">
-      <div class="user-avatar-glow">N</div>
+      <div class="user-avatar-glow">
+        {{ authStore.currentUser?.username?.charAt(0).toUpperCase() || 'U' }}
+      </div>
       <div class="user-info">
-        <span class="user-name">Nexus User</span>
-        <span class="user-role">数据中枢 (Ingestion)</span>
+        <span class="user-name">{{ authStore.currentUser?.username || 'Terminal User' }}</span>
+        <span class="user-role">沙箱 ID: {{ authStore.currentUser?.user_id || 'N/A' }}</span>
       </div>
       <el-icon class="settings-icon logout-icon" title="安全锁定沙箱" @click.stop="handleLogout">
         <SwitchButton />
