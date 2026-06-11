@@ -34,3 +34,16 @@ export const chatApi = {
     return request.get(`/api/v1/chat/history/${threadId}`)
   }
 }
+
+// 🚨 新增：联邦凭证保险库 API
+export const credentialsApi = {
+  bind(platform, token) {
+    return request.post('/api/v1/credentials/bind', { platform, token })
+  },
+  list() {
+    return request.get('/api/v1/credentials/list')
+  },
+  unbind(platform) {
+    return request.delete(`/api/v1/credentials/${platform}`)
+  }
+}

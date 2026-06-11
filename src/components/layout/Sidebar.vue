@@ -64,18 +64,65 @@
             
           </div>
         </el-tab-pane>
+        <el-tab-pane>
+          <template #label><span class="tab-label">🔗 外部联邦</span></template>
+          <div class="connector-panel">
+            <h3>联邦检索数据源 (Federated Sources)</h3>
+            <p class="panel-desc">绑定外部协作平台的访问凭证。您的 Token 将在后端通过对称加密保险库安全封存。Agent 将使用它实时穿透外部权限进行数据探索。</p>
+
+            <div class="integration-list">
+              
+              <div class="integration-card">
+                <div class="card-header">
+                  <div class="brand-title"><el-icon><Connection /></el-icon> GitHub</div>
+                  <el-tag v-if="isBound('github')" type="success" size="small" effect="dark">已安全挂载</el-tag>
+                  <el-tag v-else type="info" size="small">未配置</el-tag>
+                </div>
+                <p class="card-desc">允许 Nexus 智能体深度检索您的私有代码库、Issues 与 Pull Requests。</p>
+                
+                <div v-if="!isBound('github')" class="bind-action">
+                  <el-input v-model="bindForms.github" type="password" placeholder="ghp_xxxx..." show-password class="custom-el-input" />
+                  <el-button color="#18181b" :loading="loadingPlatforms['github']" @click="handleBind('github')">安全封存</el-button>
+                </div>
+                <div v-else class="unbind-action">
+                  <span class="bind-time">配置更新于: {{ getBoundTime('github') }}</span>
+                  <el-button type="danger" plain size="small" @click="handleUnbind('github')">物理销毁凭证</el-button>
+                </div>
+              </div>
+
+              <div class="integration-card">
+                <div class="card-header">
+                  <div class="brand-title"><el-icon><Connection /></el-icon> 飞书 (Lark)</div>
+                  <el-tag v-if="isBound('lark')" type="success" size="small" effect="dark">已安全挂载</el-tag>
+                  <el-tag v-else type="info" size="small">未配置</el-tag>
+                </div>
+                <p class="card-desc">授权 Nexus 智能体实时抓取企业内部 Wiki、云文档与多维表格情报。</p>
+                
+                <div v-if="!isBound('lark')" class="bind-action">
+                  <el-input v-model="bindForms.lark" type="password" placeholder="Tenant Access Token..." show-password class="custom-el-input" />
+                  <el-button color="#18181b" :loading="loadingPlatforms['lark']" @click="handleBind('lark')">安全封存</el-button>
+                </div>
+                <div v-else class="unbind-action">
+                  <span class="bind-time">配置更新于: {{ getBoundTime('lark') }}</span>
+                  <el-button type="danger" plain size="small" @click="handleUnbind('lark')">物理销毁凭证</el-button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </el-tab-pane>
       </el-tabs>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useChatStore } from '../../stores/chatStore'
 import { useAuthStore } from '../../stores/authStore'
-import { Plus, ChatDotRound, Setting, UploadFilled, SwitchButton } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-import { API_BASE_URL } from '../../api/index'
+import { Plus, ChatDotRound, Setting, UploadFilled, SwitchButton, Delete, Connection } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { API_BASE_URL, credentialsApi } from '../../api/index'
 
 const chatStore = useChatStore()
 const authStore = useAuthStore()
@@ -93,6 +140,73 @@ const uploadHeaders = computed(() => {
     Authorization: `Bearer ${authStore.token}`
   }
 })
+
+// ==========================================
+// 🚨 新增：联邦凭证保险库逻辑
+// ==========================================
+const credentialList = ref([])
+const bindForms = ref({ github: '', lark: '' })
+const loadingPlatforms = ref({ github: false, lark: false })
+
+// 拉取当前已绑定的脱敏列表
+const fetchCredentials = async () => {
+  try {
+    const res = await credentialsApi.list()
+    credentialList.value = res.data || []
+  } catch (e) {
+    console.error("凭证列表拉取失败", e)
+  }
+}
+
+// 监听弹窗打开，自动刷新凭证状态
+watch(kbDialogVisible, (newVal) => {
+  if (newVal) {
+    fetchCredentials()
+  }
+})
+
+// 检查某个平台是否已绑定
+const isBound = (platform) => credentialList.value.some(c => c.platform === platform)
+
+// 获取绑定时间
+const getBoundTime = (platform) => {
+  const cred = credentialList.value.find(c => c.platform === platform)
+  return cred ? cred.updated_at : ''
+}
+
+// 绑定操作
+const handleBind = async (platform) => {
+  const token = bindForms.value[platform]
+  if (!token.trim()) return ElMessage.warning('请输入有效的安全 Token')
+
+  loadingPlatforms.value[platform] = true
+  try {
+    await credentialsApi.bind(platform, token)
+    ElMessage.success(`${platform.toUpperCase()} 凭证已实施 AES-256 加密并封存！`)
+    bindForms.value[platform] = '' // 成功后立刻清空前端明文
+    await fetchCredentials()
+  } catch (e) {
+    // 错误由 axios 拦截器处理
+  } finally {
+    loadingPlatforms.value[platform] = false
+  }
+}
+
+// 销毁操作
+const handleUnbind = async (platform) => {
+  try {
+    await ElMessageBox.confirm(`确定要销毁 ${platform} 的凭证吗？Nexus 将立刻失去穿透该平台的权限。`, '安全确认', {
+      confirmButtonText: '物理销毁',
+      cancelButtonText: '取消',
+      type: 'error',
+    })
+    await credentialsApi.unbind(platform)
+    ElMessage.success(`凭证碎片已清理。`)
+    await fetchCredentials()
+  } catch (e) {
+    if (e !== 'cancel') console.error(e)
+  }
+}
 
 // 🚨 挂载时立即拉取云端记忆
 onMounted(() => {
@@ -272,4 +386,36 @@ const handleUploadError = (err) => {
 .studio-dialog .el-icon--upload { color: #a1a1aa; font-size: 48px; transition: color 0.2s; }
 .studio-dialog .el-upload-dragger:hover .el-icon--upload { color: #2563eb; }
 
+/* 联邦集成卡片样式 */
+.integration-list {
+  display: flex; flex-direction: column; gap: 16px; margin-top: 24px;
+}
+.integration-card {
+  border: 1px solid #e4e4e7; border-radius: 12px; padding: 20px;
+  background: #fafafa; transition: all 0.2s;
+}
+.integration-card:hover {
+  background: #ffffff; border-color: #d4d4d8; box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+}
+
+.card-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+}
+.brand-title {
+  display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: #18181b;
+}
+.card-desc {
+  font-size: 13px; color: #71717a; margin-bottom: 16px; line-height: 1.5;
+}
+
+.bind-action {
+  display: flex; gap: 10px; align-items: center;
+}
+.bind-action .el-input { flex: 1; }
+
+.unbind-action {
+  display: flex; justify-content: space-between; align-items: center;
+  background: #f4f4f5; padding: 12px; border-radius: 8px; border: 1px dashed #e4e4e7;
+}
+.bind-time { font-size: 12px; color: #71717a; font-family: monospace; }
 </style>
